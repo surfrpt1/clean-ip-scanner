@@ -25,9 +25,6 @@ import (
 )
 
 const (
-	xrayBufferSize        = 32768
-	xrayDownloadURL       = "https://speed.hetzner.de/100MB.bin"
-	xrayDownloadTimeout   = 15 * time.Second
 	xrayTestNum           = 10
 	xrayPort              = 443
 	xraySocksReadyTimeout = 8 * time.Second
@@ -194,8 +191,16 @@ func GetXrayDiagInfo() string {
 	if total == 0 {
 		return ""
 	}
+	const diagBoxWidth = 46
+	diagBorder := strings.Repeat("=", diagBoxWidth)
+	diagTitle := " Xray Diagnostic Report "
+	diagPad := diagBoxWidth - len(diagTitle)
+	diagLeft := diagPad / 2
+	diagRight := diagPad - diagLeft
+	diagTitledBorder := strings.Repeat("=", diagLeft) + diagTitle + strings.Repeat("=", diagRight)
+
 	var sb strings.Builder
-	sb.WriteString("\n========== Xray Diagnostic Report ==========\n")
+	sb.WriteString("\n" + diagTitledBorder + "\n")
 	if xrayDiagStartupTimeout > 0 {
 		sb.WriteString(fmt.Sprintf("  Core startup timeouts  : %d\n", xrayDiagStartupTimeout))
 		sb.WriteString("    Core port did not bind in time. Device may be under load.\n")
@@ -221,7 +226,7 @@ func GetXrayDiagInfo() string {
 		sb.WriteString("\n  NOTE: Core startup timeouts may indicate the device is too slow.\n")
 		sb.WriteString("  Try closing background apps and running again.\n")
 	}
-	sb.WriteString("=============================================\n")
+	sb.WriteString(diagBorder + "\n")
 	return sb.String()
 }
 
