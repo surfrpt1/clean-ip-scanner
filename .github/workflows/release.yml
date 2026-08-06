@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g., 3.6.0)'
+        description: 'Release version (e.g., 3.6.1)'
         required: true
         type: string
       prerelease:
@@ -214,7 +214,7 @@ jobs:
             
             Press Ctrl+C to stop and see results.
             
-            ### What's New in v3.6.0
+            ### What's New in v3.6.1
             
             - Added real upload speed testing alongside the existing download speed test
             - Every candidate IP is now tested for both download AND upload throughput using Cloudflare's speed test endpoints
@@ -222,6 +222,7 @@ jobs:
             - Upload speed is displayed next to download speed in the terminal results table
             - Upload speed is also included in `clean_ips.txt` for every saved result
             - Works in both Normal scan (TCP) and Xray scan modes
+            - Minor visual polish to the terminal output, including a more compact results table for mobile screens
             
             ### Xray Mode Configuration
             
