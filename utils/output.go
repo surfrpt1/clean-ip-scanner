@@ -3,55 +3,57 @@ package utils
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/4n0nymou3/Clean-IP-Scanner/scanner"
+	"github.com/fatih/color"
 )
+
+const tableWidth = 66
+
+var gradientStart = [3]int{57, 255, 20}
+var gradientEnd = [3]int{255, 230, 0}
+
+func rankColor(rank, total int) *color.Color {
+	if total <= 1 {
+		return color.RGB(gradientStart[0], gradientStart[1], gradientStart[2]).Add(color.Bold)
+	}
+	t := float64(rank) / float64(total-1)
+	r := gradientStart[0] + int(float64(gradientEnd[0]-gradientStart[0])*t+0.5)
+	g := gradientStart[1] + int(float64(gradientEnd[1]-gradientStart[1])*t+0.5)
+	b := gradientStart[2] + int(float64(gradientEnd[2]-gradientStart[2])*t+0.5)
+	return color.RGB(r, g, b).Add(color.Bold)
+}
 
 func PrintResults(results []scanner.IPResult) {
 	fmt.Println()
 	cyan := color.New(color.FgCyan, color.Bold)
-	cyan.Println("===========================================================================================")
-	cyan.Println("                      CLEAN IPs FOUND")
-	cyan.Println("===========================================================================================")
+	cyan.Println(strings.Repeat("=", tableWidth))
+	cyan.Println(CenterText(tableWidth, "CLEAN IPs FOUND"))
+	cyan.Println(strings.Repeat("=", tableWidth))
 	fmt.Println()
 
 	green := color.New(color.FgGreen, color.Bold)
-	white := color.New(color.FgWhite)
-	yellow := color.New(color.FgYellow, color.Bold)
 
-	green.Printf("%-6s %-20s %-6s %-10s %-10s %-14s %-18s %-18s\n",
-		"Rank", "IP Address", "Sent", "Received", "Loss", "Avg Delay", "Download Speed", "Upload Speed")
-	cyan.Println("-------------------------------------------------------------------------------------------")
+	green.Printf("%-4s%-20s%-6s%-6s%-8s%-11s%-11s\n",
+		"#", "IP", "S/R", "Loss", "Delay", "DL", "UL")
+	cyan.Println(strings.Repeat("-", tableWidth))
 
+	total := len(results)
 	for i, r := range results {
 		rank := fmt.Sprintf("%d.", i+1)
-		sent := fmt.Sprintf("%d", r.Sended)
-		recv := fmt.Sprintf("%d", r.Received)
+		sr := fmt.Sprintf("%d/%d", r.Sended, r.Received)
 		loss := fmt.Sprintf("%.2f", r.LossRate)
 		delay := fmt.Sprintf("%dms", r.Delay)
-		downloadSpeed := fmt.Sprintf("%.2f MB/s", r.DownloadSpeed/1024/1024)
-		uploadSpeed := fmt.Sprintf("%.2f MB/s", r.UploadSpeed/1024/1024)
+		downloadSpeed := fmt.Sprintf("%.2fMB/s", r.DownloadSpeed/1024/1024)
+		uploadSpeed := fmt.Sprintf("%.2fMB/s", r.UploadSpeed/1024/1024)
 
-		if i == 0 {
-			yellow.Printf("%-6s %-20s %-6s %-10s %-10s %-14s %-18s %-18s\n",
-				rank, r.IP.String(), sent, recv, loss, delay, downloadSpeed, uploadSpeed)
-		} else if r.LossRate == 0 && r.Delay < 150 {
-			white.Printf("%-6s ", rank)
-			color.New(color.FgGreen).Printf("%-20s %-6s %-10s %-10s %-14s %-18s %-18s\n",
-				r.IP.String(), sent, recv, loss, delay, downloadSpeed, uploadSpeed)
-		} else if r.LossRate == 0 {
-			white.Printf("%-6s ", rank)
-			color.New(color.FgCyan).Printf("%-20s %-6s %-10s %-10s %-14s %-18s %-18s\n",
-				r.IP.String(), sent, recv, loss, delay, downloadSpeed, uploadSpeed)
-		} else {
-			white.Printf("%-6s %-20s %-6s %-10s %-10s %-14s %-18s %-18s\n",
-				rank, r.IP.String(), sent, recv, loss, delay, downloadSpeed, uploadSpeed)
-		}
+		rankColor(i, total).Printf("%-4s%-20s%-6s%-6s%-8s%-11s%-11s\n",
+			rank, r.IP.String(), sr, loss, delay, downloadSpeed, uploadSpeed)
 	}
 
-	cyan.Println("===========================================================================================")
+	cyan.Println(strings.Repeat("=", tableWidth))
 }
 
 func SaveResults(results []scanner.IPResult, filename string) error {
