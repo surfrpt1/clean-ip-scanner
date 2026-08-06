@@ -17,7 +17,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const version = "3.6.0"
+const version = "3.6.1"
 
 func clearScreen() {
 	fmt.Print("\033[H\033[2J\033[3J")
@@ -30,16 +30,18 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%02d:%02d:%02d", h, m, s)
 }
 
+const statsBoxWidth = 49
+
 func printScanStats(elapsed time.Duration, interrupted bool) {
 	fmt.Println()
 	cyan := color.New(color.FgCyan, color.Bold)
-	cyan.Println("========================================")
+	cyan.Println(strings.Repeat("=", statsBoxWidth))
 	if interrupted {
-		color.New(color.FgYellow, color.Bold).Println("         Scan stopped by user")
+		color.New(color.FgYellow, color.Bold).Println(utils.CenterText(statsBoxWidth, "Scan stopped by user"))
 	} else {
-		cyan.Println("      Scan completed successfully!")
+		cyan.Println(utils.CenterText(statsBoxWidth, "Scan completed successfully!"))
 	}
-	cyan.Println("========================================")
+	cyan.Println(strings.Repeat("=", statsBoxWidth))
 	fmt.Println()
 	color.New(color.FgCyan).Printf("  Scan Duration : %s\n", formatDuration(elapsed))
 	fmt.Println()
@@ -174,12 +176,15 @@ func main() {
 		skipPingPhase bool
 	)
 
+	const unfinishedBoxInner = 49
+	unfinishedBorder := "+" + strings.Repeat("-", unfinishedBoxInner) + "+"
+
 	existingCP := scanner.LoadCheckpoint()
 	if existingCP != nil {
 		fmt.Println()
-		color.New(color.FgYellow, color.Bold).Println("+-------------------------------------------------+")
-		color.New(color.FgYellow, color.Bold).Println("|         UNFINISHED SCAN DETECTED                |")
-		color.New(color.FgYellow, color.Bold).Println("+-------------------------------------------------+")
+		color.New(color.FgYellow, color.Bold).Println(unfinishedBorder)
+		color.New(color.FgYellow, color.Bold).Println("|" + utils.CenterInBox(unfinishedBoxInner, "UNFINISHED SCAN DETECTED") + "|")
+		color.New(color.FgYellow, color.Bold).Println(unfinishedBorder)
 		fmt.Println()
 
 		modeStr := "Normal (TCP)"
