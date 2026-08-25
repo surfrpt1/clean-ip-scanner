@@ -43,6 +43,7 @@ if [ ! -f "go.mod" ]; then
 fi
 
 echo -e "${CYAN}Downloading dependencies...${NC}"
+go mod download
 go mod tidy
 
 echo -e "${CYAN}Building...${NC}"
