@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	defaultWorkers     = 50
+	defaultWorkers     = 10
 	defaultTestCount   = 20
-	defaultPingTimes   = 3
+	defaultPingTimes   = 2
 	defaultDownloadURL = "https://speed.cloudflare.com/__down?bytes=50000000"
 	defaultUploadURL   = "https://speed.cloudflare.com/__up?bytes=25000000"
 	defaultCPFile      = "./checkpoint.json"
@@ -33,6 +33,7 @@ func main() {
 		save        bool
 		resetCP     bool
 		xrayMode    bool
+		lightMode   bool
 	)
 
 	flag.IntVar(&scanMode, "mode", 0, "Scan mode: 0=normal, 1=download only, 2=upload only")
@@ -43,6 +44,7 @@ func main() {
 	flag.BoolVar(&save, "save", false, "Save results to file")
 	flag.BoolVar(&resetCP, "reset", false, "Reset checkpoint and start fresh")
 	flag.BoolVar(&xrayMode, "xray", false, "Use Xray mode (requires xray binary at ./xray/xray)")
+	flag.BoolVar(&lightMode, "light", false, "Light mode: skip speed tests, only ping (recommended for iPad)")
 	flag.Parse()
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -148,31 +150,39 @@ func main() {
 		}
 	}
 
-	// Speed test
-	switch scanMode {
-	case 0:
-		results := scanner.SpeedTest(stopCh, pingResults, defaultDownloadURL, defaultUploadURL, xrayMode, testCount)
-		utils.PrintResults(results)
+	// Speed test or light mode
+	if lightMode {
+		utils.PrintPingResults(pingResults, testCount)
 		if save {
-			utils.SaveResults(results, "results.txt")
-			utils.SaveSimpleResults(results, pingResults, "simple_results.txt")
-			color.New(color.FgGreen).Println("Results saved to results.txt and simple_results.txt")
+			utils.SavePingResults(pingResults, testCount, "results.txt")
+			color.New(color.FgGreen).Println("Results saved to results.txt")
 		}
-	case 1:
-		results := scanner.DownloadTest(stopCh, pingResults, defaultDownloadURL, xrayMode, testCount)
-		utils.PrintResults(results)
-		if save {
-			utils.SaveResults(results, "results.txt")
-			utils.SaveSimpleResults(results, pingResults, "simple_results.txt")
-			color.New(color.FgGreen).Println("Results saved to results.txt and simple_results.txt")
-		}
-	case 2:
-		results := scanner.UploadTest(stopCh, pingResults, defaultUploadURL, xrayMode, testCount)
-		utils.PrintResults(results)
-		if save {
-			utils.SaveResults(results, "results.txt")
-			utils.SaveSimpleResults(results, pingResults, "simple_results.txt")
-			color.New(color.FgGreen).Println("Results saved to results.txt and simple_results.txt")
+	} else {
+		switch scanMode {
+		case 0:
+			results := scanner.SpeedTest(stopCh, pingResults, defaultDownloadURL, defaultUploadURL, xrayMode, testCount)
+			utils.PrintResults(results)
+			if save {
+				utils.SaveResults(results, "results.txt")
+				utils.SaveSimpleResults(results, pingResults, "simple_results.txt")
+				color.New(color.FgGreen).Println("Results saved to results.txt and simple_results.txt")
+			}
+		case 1:
+			results := scanner.DownloadTest(stopCh, pingResults, defaultDownloadURL, xrayMode, testCount)
+			utils.PrintResults(results)
+			if save {
+				utils.SaveResults(results, "results.txt")
+				utils.SaveSimpleResults(results, pingResults, "simple_results.txt")
+				color.New(color.FgGreen).Println("Results saved to results.txt and simple_results.txt")
+			}
+		case 2:
+			results := scanner.UploadTest(stopCh, pingResults, defaultUploadURL, xrayMode, testCount)
+			utils.PrintResults(results)
+			if save {
+				utils.SaveResults(results, "results.txt")
+				utils.SaveSimpleResults(results, pingResults, "simple_results.txt")
+				color.New(color.FgGreen).Println("Results saved to results.txt and simple_results.txt")
+			}
 		}
 	}
 

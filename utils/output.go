@@ -113,3 +113,59 @@ func SaveSimpleResults(topResults []scanner.IPResult, pingResults []scanner.Ping
 
 	return nil
 }
+
+func PrintPingResults(pingResults []scanner.PingResult, count int) {
+	fmt.Println()
+	cyan := color.New(color.FgCyan, color.Bold)
+	cyan.Println(strings.Repeat("=", 50))
+	cyan.Println(CenterText(50, "TOP CLEAN IPs BY LATENCY"))
+	cyan.Println(strings.Repeat("=", 50))
+	fmt.Println()
+
+	green := color.New(color.FgGreen, color.Bold)
+	green.Printf("%-4s%-20s%-6s%-6s%-10s\n", "#", "IP", "S/R", "Loss", "Delay")
+	cyan.Println(strings.Repeat("-", 50))
+
+	total := len(pingResults)
+	if count > total {
+		count = total
+	}
+
+	for i := 0; i < count; i++ {
+		r := pingResults[i]
+		rank := fmt.Sprintf("%d.", i+1)
+		sr := fmt.Sprintf("%d/%d", r.Sended, r.Received)
+		loss := fmt.Sprintf("%.2f", r.GetLossRate())
+		delay := fmt.Sprintf("%dms", r.Delay.Milliseconds())
+
+		rankColor(i, count).Printf("%-4s%-20s%-6s%-6s%-10s\n",
+			rank, r.IP.String(), sr, loss, delay)
+	}
+
+	cyan.Println(strings.Repeat("=", 50))
+}
+
+func SavePingResults(pingResults []scanner.PingResult, count int, filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	file.WriteString("# Clean IPs (by latency)\n")
+	file.WriteString(fmt.Sprintf("# Generated at: %s\n", time.Now().Format("2006-01-02 15:04:05")))
+
+	if count > len(pingResults) {
+		count = len(pingResults)
+	}
+
+	file.WriteString(fmt.Sprintf("# Top %d IPs:\n\n", count))
+	for i := 0; i < count; i++ {
+		r := pingResults[i]
+		line := fmt.Sprintf("%d. %s | %dms | %d/%d\n",
+			i+1, r.IP.String(), r.Delay.Milliseconds(), r.Received, r.Sended)
+		file.WriteString(line)
+	}
+
+	return nil
+}
