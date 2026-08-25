@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -19,7 +18,7 @@ const (
 )
 
 var (
-	port            = defaultPort
+	port             = defaultPort
 	overridePingTimes = 0
 )
 
@@ -100,9 +99,10 @@ func PingIPsTCP(stopCh <-chan struct{}, ips []CompactIP, workers int, cp *Checkp
 	sendCount := getSendCount()
 
 	cyan := color.New(color.FgCyan)
-	cyan.Printf("Start latency test (Mode: TCP, Port: %d, Range: 0 ~ %d ms)\n", port, timeoutMs)
+	cyan.Printf("Start latency test (TCP port %d, timeout %dms, workers %d)\n", port, timeoutMs, workers)
 
 	bar := newBar(total, "Available:", "")
+	lastPrinted := 0
 
 	for _, cip := range ips {
 		select {
@@ -125,7 +125,7 @@ func PingIPsTCP(stopCh <-chan struct{}, ips []CompactIP, workers int, cp *Checkp
 			if recv != 0 {
 				nowAble++
 			}
-			bar.grow(1, strconv.Itoa(nowAble))
+			bar.grow(1, fmt.Sprintf("%d", nowAble))
 			if recv > 0 {
 				avg := totalDelay / time.Duration(recv)
 				results = append(results, PingResult{
@@ -134,6 +134,11 @@ func PingIPsTCP(stopCh <-chan struct{}, ips []CompactIP, workers int, cp *Checkp
 					Received: recv,
 					Delay:    avg,
 				})
+				if len(results) > lastPrinted {
+					lastPrinted = len(results)
+					green := color.New(color.FgGreen)
+					green.Printf("\n  [+] %s  %dms\n", ipAddr.String(), avg.Milliseconds())
+				}
 			}
 			if cp != nil && processedCount%saveIntervalMode1 == 0 {
 				cp.ProgressIndex = baseIndex + processedCount
@@ -160,8 +165,17 @@ done:
 		return results[i].Delay < results[j].Delay
 	})
 
-	fmt.Println()
-	color.New(color.FgGreen).Printf("Latency test completed: %d responsive IPs found\n\n", len(results))
+	if len(results) > 0 {
+		fmt.Println()
+		cyan := color.New(color.FgCyan, color.Bold)
+		cyan.Println("Top IPs by latency:")
+		for i, r := range results {
+			if i >= 10 {
+				break
+			}
+			color.New(color.FgGreen).Printf("  %2d. %-18s %4dms\n", i+1, r.IP.String(), r.Delay.Milliseconds())
+		}
+	}
 
 	return results
 }
