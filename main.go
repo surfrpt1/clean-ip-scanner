@@ -17,7 +17,7 @@ import (
 
 const (
 	defaultWorkers     = 50
-	defaultTestCount   = 3
+	defaultTestCount   = 20
 	defaultPingTimes   = 3
 	defaultDownloadURL = "https://speed.cloudflare.com/__down?bytes=50000000"
 	defaultUploadURL   = "https://speed.cloudflare.com/__up?bytes=25000000"
