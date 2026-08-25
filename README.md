@@ -69,6 +69,10 @@ Results are saved to:
 - `results.txt` - Full results with speeds
 - `simple_results.txt` - Simple IP list
 
+## Disclaimer
+
+This software is provided for **educational and research purposes only**. Use it at your own risk. The authors are not responsible for any misuse, legal consequences, or damages arising from the use of this tool. Users are solely responsible for ensuring their use complies with all applicable laws and regulations in their jurisdiction. By using this software, you agree that you will only use it in a lawful manner and accept all responsibility for your actions.
+
 ## License
 
 MIT

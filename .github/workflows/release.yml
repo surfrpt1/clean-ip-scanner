@@ -1,0 +1,234 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 3.6.1)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+        default: 'false'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+
+      - name: Get Go dependencies
+        run: |
+          go mod download
+          go mod tidy
+
+      - name: Build clean-ip-scanner for Android ARM64
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o clean-ip-scanner
+
+      - name: Verify Go build
+        run: |
+          file clean-ip-scanner
+          ls -lh clean-ip-scanner
+
+      - name: Download Xray core latest stable (Android ARM64-v8a)
+        run: |
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+
+          install_xray() {
+            echo "Attempting to download Xray (Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..."
+
+            LATEST_URL=$(curl -sL "https://api.github.com/repos/XTLS/Xray-core/releases/latest" | jq -r '.assets[] | select(.name=="Xray-android-arm64-v8a.zip") | .browser_download_url')
+
+            if [ -z "$LATEST_URL" ] || [ "$LATEST_URL" = "null" ]; then
+              echo "Failed to fetch Xray download URL from GitHub API"
+              return 1
+            fi
+
+            echo "Downloading from $LATEST_URL"
+
+            if ! curl -L --retry 3 --retry-delay 5 -o xray-core.zip "$LATEST_URL"; then
+              echo "Failed to download Xray"
+              return 1
+            fi
+
+            if [ ! -f xray-core.zip ] || [ ! -s xray-core.zip ]; then
+              echo "Downloaded file is missing or empty"
+              return 1
+            fi
+
+            if ! unzip -o xray-core.zip -d xray_temp; then
+              echo "Failed to unzip Xray"
+              rm -f xray-core.zip
+              return 1
+            fi
+
+            mkdir -p xray
+            cp xray_temp/xray xray/
+            chmod +x xray/xray
+            rm -rf xray_temp xray-core.zip
+            echo "Xray binary ready at ./xray/xray"
+            return 0
+          }
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if install_xray; then
+              echo "✓ Xray download successful"
+              exit 0
+            else
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                echo "Retrying in 30 seconds..."
+                sleep 30
+              fi
+            fi
+          done
+
+          echo "Trying fallback with hardcoded version..."
+          FALLBACK_VERSION="v26.3.27"
+          FALLBACK_URL="https://github.com/XTLS/Xray-core/releases/download/${FALLBACK_VERSION}/Xray-android-arm64-v8a.zip"
+          echo "Using fallback URL: $FALLBACK_URL"
+
+          if curl -L --retry 3 -o xray-core.zip "$FALLBACK_URL" && \
+             unzip -o xray-core.zip -d xray_temp && \
+             mkdir -p xray && \
+             cp xray_temp/xray xray/ && \
+             chmod +x xray/xray; then
+            rm -rf xray_temp xray-core.zip
+            echo "✓ Xray installed using fallback version"
+            exit 0
+          else
+            echo "✗ Fallback also failed"
+            exit 1
+          fi
+
+      - name: Prepare config directory and sample configs
+        run: |
+          mkdir -p config
+          cat > config/xray_config.json << 'EOF'
+          {
+            "log": { "loglevel": "warning" },
+            "inbounds": [
+              {
+                "port": 1080,
+                "protocol": "socks",
+                "settings": { "udp": false },
+                "listen": "127.0.0.1"
+              }
+            ],
+            "outbounds": [
+              {
+                "protocol": "vless",
+                "settings": {
+                  "vnext": [
+                    {
+                      "address": "IP_PLACEHOLDER",
+                      "port": 443,
+                      "users": [
+                        { "id": "your-uuid-here", "encryption": "none", "flow": "xtls-rprx-vision" }
+                      ]
+                    }
+                  ]
+                },
+                "streamSettings": {
+                  "network": "tcp",
+                  "security": "tls",
+                  "tlsSettings": {
+                    "serverName": "your-domain.com",
+                    "allowInsecure": false
+                  }
+                }
+              }
+            ]
+          }
+          EOF
+          cat > config/xray_config.txt << 'EOF'
+          # Xray URL Config
+          # Put your proxy URL on the line below (remove the # at the start).
+          # Supported formats: vless://, vmess://, trojan://, ss://
+          # Example:
+          # vless://your-uuid@your-server.com:443?type=ws&security=tls&host=your-server.com&path=%2F&sni=your-server.com#MyConfig
+          #
+          # If this file has a valid URL, it will be used instead of xray_config.json.
+          EOF
+          echo "Sample configs created"
+
+      - name: Create zip package
+        run: |
+          zip -r clean-ip-scanner-arm64.zip clean-ip-scanner xray/ config/
+          echo "Created clean-ip-scanner-arm64.zip"
+          ls -lh clean-ip-scanner-arm64.zip
+
+      - name: Create Release and Upload Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          name: v${{ github.event.inputs.version }}
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          files: clean-ip-scanner-arm64.zip
+          body: |
+            ## Clean IP Scanner v${{ github.event.inputs.version }}
+            
+            **Clean IP Scanner for Termux (Android ARM64)**
+            
+            ### Installation (Direct Download)
+            
+            ```
+            pkg update && pkg upgrade -y && pkg install -y wget unzip && wget https://github.com/${{ github.repository }}/releases/latest/download/clean-ip-scanner-arm64.zip && unzip clean-ip-scanner-arm64.zip && chmod +x clean-ip-scanner
+            ```
+            
+            Then run:
+            
+            ```
+            ./clean-ip-scanner
+            ```
+            
+            ### Installation (Build from Source with Xray)
+            
+            ```
+            curl -sL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash
+            ```
+            
+            ### Usage
+            
+            ```
+            clean-ip-scanner
+            ```
+            
+            Then choose: 1 for normal scan, 2 for Xray scan.
+            
+            Press Ctrl+C to stop and see results.
+            
+            ### What's New in v3.6.1
+            
+            - Added real upload speed testing alongside the existing download speed test
+            - Every candidate IP is now tested for both download AND upload throughput using Cloudflare's speed test endpoints
+            - Results are now ranked by combined download + upload speed instead of download speed alone
+            - Upload speed is displayed next to download speed in the terminal results table
+            - Upload speed is also included in `clean_ips.txt` for every saved result
+            - Works in both Normal scan (TCP) and Xray scan modes
+            - Minor visual polish to the terminal output, including a more compact results table for mobile screens
+            
+            ### Xray Mode Configuration
+            
+            Edit **one** of these files with your config:
+            - **URL format** → `config/xray_config.txt`
+            - **JSON format** → `config/xray_config.json`
+            
+            ---
+            Made with love for Iranian users
