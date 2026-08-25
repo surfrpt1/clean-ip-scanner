@@ -41,9 +41,13 @@ func loadRanges(filename string) ([]string, error) {
 }
 
 func getConfigDir() string {
-	// First try current working directory
-	if _, err := os.Stat("config/ipv4.txt"); err == nil {
+	// Try current directory first
+	if _, err := os.Stat("ipv4.txt"); err == nil {
 		return "."
+	}
+	// Try config subdirectory
+	if _, err := os.Stat("config/ipv4.txt"); err == nil {
+		return "config"
 	}
 	// Fall back to executable directory
 	exe, err := os.Executable()

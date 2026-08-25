@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	defaultWorkers     = 200
-	defaultTestCount   = 5
-	defaultPingTimes   = 5
+	defaultWorkers     = 50
+	defaultTestCount   = 3
+	defaultPingTimes   = 3
 	defaultDownloadURL = "https://speed.cloudflare.com/__down?bytes=50000000"
 	defaultUploadURL   = "https://speed.cloudflare.com/__up?bytes=25000000"
 	defaultCPFile      = "./checkpoint.json"
@@ -140,6 +140,7 @@ func main() {
 		pingResults = cp.GetPingResults()
 		color.New(color.FgGreen).Printf("Loaded %d previous ping results from checkpoint\n", len(pingResults))
 	} else {
+		color.New(color.FgCyan).Printf("Starting scan of %d IPs...\n\n", len(ips))
 		if xrayMode {
 			pingResults = scanner.PingIPsViaXray(stopCh, ips, workers, cp, nil)
 		} else {
