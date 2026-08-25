@@ -8,11 +8,6 @@ import (
 	"time"
 )
 
-const (
-	saveIntervalMode1 = 100
-	saveIntervalMode2 = 20
-)
-
 type CheckpointPhase string
 
 const (

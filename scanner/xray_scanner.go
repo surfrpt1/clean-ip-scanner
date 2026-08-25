@@ -1279,17 +1279,17 @@ func PingIPsViaXray(stopCh <-chan struct{}, ips []CompactIP, workers int, cp *Ch
 	return results
 }
 
-func downloadSpeedViaXray(ip *net.IPAddr) float64 {
-	bytesPerSec := downloadHandler(ip)
+func downloadSpeedViaXray(ip *net.IPAddr, downloadURL string) float64 {
+	bytesPerSec := downloadHandler(ip, downloadURL)
 	return bytesPerSec / (1024 * 1024)
 }
 
-func uploadSpeedViaXray(ip *net.IPAddr) float64 {
-	bytesPerSec := uploadHandler(ip)
+func uploadSpeedViaXray(ip *net.IPAddr, uploadURL string) float64 {
+	bytesPerSec := uploadHandler(ip, uploadURL)
 	return bytesPerSec / (1024 * 1024)
 }
 
-func SpeedTestViaXray(stopCh <-chan struct{}, pingResults []PingResult) []IPResult {
+func SpeedTestViaXray(stopCh <-chan struct{}, pingResults []PingResult, downloadURL, uploadURL string) []IPResult {
 	testCount := xrayTestNum
 	testNum := testCount
 	if len(pingResults) < testCount {
@@ -1310,8 +1310,8 @@ func SpeedTestViaXray(stopCh <-chan struct{}, pingResults []PingResult) []IPResu
 		default:
 		}
 		pr := pingResults[i]
-		downloadMBps := downloadSpeedViaXray(pr.IP)
-		uploadMBps := uploadSpeedViaXray(pr.IP)
+		downloadMBps := downloadSpeedViaXray(pr.IP, downloadURL)
+		uploadMBps := uploadSpeedViaXray(pr.IP, uploadURL)
 		bar.grow(1, "")
 		results = append(results, IPResult{
 			IP:            pr.IP,

@@ -16,14 +16,20 @@ var gradientStart = [3]int{57, 255, 20}
 var gradientEnd = [3]int{255, 230, 0}
 
 func rankColor(rank, total int) *color.Color {
+	c := color.New(color.FgGreen, color.Bold)
 	if total <= 1 {
-		return color.RGB(gradientStart[0], gradientStart[1], gradientStart[2]).Add(color.Bold)
+		return c
 	}
 	t := float64(rank) / float64(total-1)
-	r := gradientStart[0] + int(float64(gradientEnd[0]-gradientStart[0])*t+0.5)
-	g := gradientStart[1] + int(float64(gradientEnd[1]-gradientStart[1])*t+0.5)
-	b := gradientStart[2] + int(float64(gradientEnd[2]-gradientStart[2])*t+0.5)
-	return color.RGB(r, g, b).Add(color.Bold)
+	switch {
+	case t < 0.33:
+		c = color.New(color.FgGreen, color.Bold)
+	case t < 0.66:
+		c = color.New(color.FgYellow, color.Bold)
+	default:
+		c = color.New(color.FgRed, color.Bold)
+	}
+	return c
 }
 
 func PrintResults(results []scanner.IPResult) {
