@@ -13,4 +13,4 @@ go.sum
 *.swo
 *~
 .vscode/
-.idea/
+.idea/test-scanner.exe
