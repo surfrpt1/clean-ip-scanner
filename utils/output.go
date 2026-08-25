@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/4n0nymou3/Clean-IP-Scanner/scanner"
+	"github.com/surfrpt1/clean-ip-scanner/scanner"
 	"github.com/fatih/color"
 )
 

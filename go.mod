@@ -1,4 +1,4 @@
-module github.com/4n0nymou3/Clean-IP-Scanner
+module github.com/surfrpt1/clean-ip-scanner
 
 go 1.23
 

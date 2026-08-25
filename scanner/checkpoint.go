@@ -9,9 +9,8 @@ import (
 )
 
 const (
-	checkpointFile    = "scan_checkpoint.json"
-	saveIntervalMode1 = 2000
-	saveIntervalMode2 = 500
+	saveIntervalMode1 = 100
+	saveIntervalMode2 = 20
 )
 
 type CheckpointPhase string
@@ -85,21 +84,21 @@ func (c *Checkpoint) GetPingResults() []PingResult {
 	return results
 }
 
-func (c *Checkpoint) save() error {
+func (c *Checkpoint) saveToFile(filename string) error {
 	c.SavedAt = time.Now().Format("2006-01-02 15:04:05")
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		return err
 	}
-	tmpPath := checkpointFile + ".tmp"
+	tmpPath := filename + ".tmp"
 	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
 		return err
 	}
-	return os.Rename(tmpPath, checkpointFile)
+	return os.Rename(tmpPath, filename)
 }
 
 func (c *Checkpoint) Save() {
-	c.save()
+	c.saveToFile("checkpoint.json")
 }
 
 func (c *Checkpoint) SaveAsync() {
@@ -113,7 +112,7 @@ func (c *Checkpoint) SaveAsync() {
 	asyncSaveMu.Unlock()
 
 	go func() {
-		snapshot.save()
+		snapshot.saveToFile("checkpoint.json")
 		asyncSaveMu.Lock()
 		asyncSaveRunning = false
 		asyncSaveMu.Unlock()
@@ -124,17 +123,17 @@ func (c *Checkpoint) MarkPingDone(allPingResults []PingResult) {
 	c.Phase = PhaseSpeed
 	c.ProgressIndex = c.TotalIPs
 	c.SetPingResults(allPingResults)
-	c.save()
+	c.Save()
 }
 
 func (c *Checkpoint) MarkCompleted() {
 	c.Completed = true
 	c.Phase = PhaseDone
-	c.save()
+	c.Save()
 }
 
-func LoadCheckpoint() *Checkpoint {
-	data, err := os.ReadFile(checkpointFile)
+func LoadCheckpoint(filename string) *Checkpoint {
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil
 	}
@@ -142,13 +141,13 @@ func LoadCheckpoint() *Checkpoint {
 	if err := json.Unmarshal(data, &cp); err != nil {
 		return nil
 	}
-	if cp.Completed || cp.TotalIPs == 0 || cp.Seed == 0 {
+	if cp.Completed || cp.TotalIPs == 0 {
 		return nil
 	}
 	return &cp
 }
 
-func DeleteCheckpoint() {
-	os.Remove(checkpointFile)
-	os.Remove(checkpointFile + ".tmp")
+func DeleteCheckpoint(filename string) {
+	os.Remove(filename)
+	os.Remove(filename + ".tmp")
 }

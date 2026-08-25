@@ -17,13 +17,12 @@ import (
 
 const (
 	bufferSize      = 32768
-	downloadURL     = "https://speed.cloudflare.com/__down?bytes=52428800"
-	uploadURL       = "https://speed.cloudflare.com/__up"
 	downloadTimeout = 10 * time.Second
 	uploadTimeout   = 10 * time.Second
 	uploadBytes     = 26214400
 	defaultTestNum  = 10
 	minSpeed        = 0.0
+	saveIntervalMode2 = 20
 )
 
 type IPResult struct {
@@ -108,7 +107,7 @@ func (r *uploadReader) speedBytesPerSec(timeout time.Duration) float64 {
 
 func getDialContext(ip *net.IPAddr) func(ctx context.Context, network, address string) (net.Conn, error) {
 	var targetAddr string
-	if isIPv4(ip.String()) {
+	if IsIPv4(ip.String()) {
 		targetAddr = fmt.Sprintf("%s:%d", ip.String(), port)
 	} else {
 		targetAddr = fmt.Sprintf("[%s]:%d", ip.String(), port)
@@ -120,7 +119,7 @@ func getDialContext(ip *net.IPAddr) func(ctx context.Context, network, address s
 	}
 }
 
-func downloadHandler(ip *net.IPAddr) float64 {
+func downloadHandler(ip *net.IPAddr, downloadURL string) float64 {
 	client := &http.Client{
 		Transport: &http.Transport{
 			DialContext:           getDialContext(ip),
@@ -142,7 +141,7 @@ func downloadHandler(ip *net.IPAddr) float64 {
 	if err != nil {
 		return 0.0
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
 	response, err := client.Do(req)
 	if err != nil {
@@ -201,7 +200,7 @@ func downloadHandler(ip *net.IPAddr) float64 {
 	return e.Value() * 100 / downloadTimeout.Seconds()
 }
 
-func uploadHandler(ip *net.IPAddr) float64 {
+func uploadHandler(ip *net.IPAddr, uploadURL string) float64 {
 	reader := newUploadReader(uploadBytes, uploadTimeout)
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -218,7 +217,7 @@ func uploadHandler(ip *net.IPAddr) float64 {
 	if err != nil {
 		return 0.0
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.80 Safari/537.36")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 	req.Header.Set("Content-Type", "application/octet-stream")
 	req.ContentLength = uploadBytes
 
@@ -237,8 +236,7 @@ func uploadHandler(ip *net.IPAddr) float64 {
 	return speed
 }
 
-func SpeedTest(stopCh <-chan struct{}, pingResults []PingResult) []IPResult {
-	testCount := defaultTestNum
+func SpeedTest(stopCh <-chan struct{}, pingResults []PingResult, downloadURL, uploadURL string, xrayMode bool, testCount int) []IPResult {
 	testNum := testCount
 	if len(pingResults) < testCount {
 		testNum = len(pingResults)
@@ -250,10 +248,13 @@ func SpeedTest(stopCh <-chan struct{}, pingResults []PingResult) []IPResult {
 		barPadding += " "
 	}
 
-	color.New(color.FgCyan).Printf("Start download & upload speed test (Minimum speed: %.2f MB/s, Number: %d, Queue: %d)\n", minSpeed, testCount, testNum)
+	modeName := "Normal"
+	if xrayMode {
+		modeName = "Xray"
+	}
+	color.New(color.FgCyan).Printf("Start download & upload speed test (%s mode, Number: %d, Queue: %d)\n", modeName, testCount, testNum)
 
 	bar := newBar(testCount, barPadding, "")
-
 	var results []IPResult
 
 	for i := 0; i < testNum; i++ {
@@ -264,23 +265,21 @@ func SpeedTest(stopCh <-chan struct{}, pingResults []PingResult) []IPResult {
 		}
 
 		pr := pingResults[i]
-		downloadSpeed := downloadHandler(pr.IP)
+		downloadMBps := downloadHandler(pr.IP, downloadURL)
+		uploadMBps := uploadHandler(pr.IP, uploadURL)
 
-		if downloadSpeed >= minSpeed {
-			uploadSpeed := uploadHandler(pr.IP)
-			bar.grow(1, "")
-			results = append(results, IPResult{
-				IP:            pr.IP,
-				Sended:        pr.Sended,
-				Received:      pr.Received,
-				LossRate:      pr.GetLossRate(),
-				Delay:         int(pr.Delay.Milliseconds()),
-				DownloadSpeed: downloadSpeed,
-				UploadSpeed:   uploadSpeed,
-			})
-			if len(results) == testCount {
-				break
-			}
+		bar.grow(1, "")
+		results = append(results, IPResult{
+			IP:            pr.IP,
+			Sended:        pr.Sended,
+			Received:      pr.Received,
+			LossRate:      pr.GetLossRate(),
+			Delay:         int(pr.Delay.Milliseconds()),
+			DownloadSpeed: downloadMBps,
+			UploadSpeed:   uploadMBps,
+		})
+		if len(results) == testCount {
+			break
 		}
 	}
 
@@ -295,5 +294,125 @@ done:
 
 	fmt.Println()
 	color.New(color.FgGreen).Printf("Speed test completed: %d clean IPs found\n\n", len(results))
+	return results
+}
+
+func DownloadTest(stopCh <-chan struct{}, pingResults []PingResult, downloadURL string, xrayMode bool, testCount int) []IPResult {
+	testNum := testCount
+	if len(pingResults) < testCount {
+		testNum = len(pingResults)
+		testCount = testNum
+	}
+
+	barPadding := "     "
+	for i := 0; i < len(strconv.Itoa(len(pingResults))); i++ {
+		barPadding += " "
+	}
+
+	modeName := "Normal"
+	if xrayMode {
+		modeName = "Xray"
+	}
+	color.New(color.FgCyan).Printf("Start download speed test (%s mode, Number: %d, Queue: %d)\n", modeName, testCount, testNum)
+
+	bar := newBar(testCount, barPadding, "")
+	var results []IPResult
+
+	for i := 0; i < testNum; i++ {
+		select {
+		case <-stopCh:
+			goto done
+		default:
+		}
+
+		pr := pingResults[i]
+		downloadMBps := downloadHandler(pr.IP, downloadURL)
+
+		bar.grow(1, "")
+		results = append(results, IPResult{
+			IP:            pr.IP,
+			Sended:        pr.Sended,
+			Received:      pr.Received,
+			LossRate:      pr.GetLossRate(),
+			Delay:         int(pr.Delay.Milliseconds()),
+			DownloadSpeed: downloadMBps,
+			UploadSpeed:   0,
+		})
+		if len(results) == testCount {
+			break
+		}
+	}
+
+done:
+	bar.done()
+
+	if len(results) > 0 {
+		sort.Slice(results, func(i, j int) bool {
+			return results[i].DownloadSpeed > results[j].DownloadSpeed
+		})
+	}
+
+	fmt.Println()
+	color.New(color.FgGreen).Printf("Download test completed: %d clean IPs found\n\n", len(results))
+	return results
+}
+
+func UploadTest(stopCh <-chan struct{}, pingResults []PingResult, uploadURL string, xrayMode bool, testCount int) []IPResult {
+	testNum := testCount
+	if len(pingResults) < testCount {
+		testNum = len(pingResults)
+		testCount = testNum
+	}
+
+	barPadding := "     "
+	for i := 0; i < len(strconv.Itoa(len(pingResults))); i++ {
+		barPadding += " "
+	}
+
+	modeName := "Normal"
+	if xrayMode {
+		modeName = "Xray"
+	}
+	color.New(color.FgCyan).Printf("Start upload speed test (%s mode, Number: %d, Queue: %d)\n", modeName, testCount, testNum)
+
+	bar := newBar(testCount, barPadding, "")
+	var results []IPResult
+
+	for i := 0; i < testNum; i++ {
+		select {
+		case <-stopCh:
+			goto done
+		default:
+		}
+
+		pr := pingResults[i]
+		uploadMBps := uploadHandler(pr.IP, uploadURL)
+
+		bar.grow(1, "")
+		results = append(results, IPResult{
+			IP:            pr.IP,
+			Sended:        pr.Sended,
+			Received:      pr.Received,
+			LossRate:      pr.GetLossRate(),
+			Delay:         int(pr.Delay.Milliseconds()),
+			DownloadSpeed: 0,
+			UploadSpeed:   uploadMBps,
+		})
+		if len(results) == testCount {
+			break
+		}
+	}
+
+done:
+	bar.done()
+
+	if len(results) > 0 {
+		sort.Slice(results, func(i, j int) bool {
+			return results[i].UploadSpeed > results[j].UploadSpeed
+		})
+	}
+
+	fmt.Println()
+	color.New(color.FgGreen).Printf("Upload test completed: %d clean IPs found\n\n", len(results))
 	return results
 }

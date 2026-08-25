@@ -92,7 +92,7 @@ func (r *IPRanges) expandCIDR(cidr string) {
 			proto = "IPv6"
 		}
 		neededBits := bits - int(log2Ceil(maxIPsPerCIDR))
-		fmt.Printf("Skipping %s (%s /%d): contains %s addresses — exceeds limit of %s.\n",
+		fmt.Printf("Skipping %s (%s /%d): contains %s addresses - exceeds limit of %s.\n",
 			cidr, proto, ones,
 			formatBigInt(count),
 			formatBigInt(limit),
@@ -155,7 +155,7 @@ func incrementIP(ip net.IP) {
 	}
 }
 
-func isIPv4(ip string) bool {
+func IsIPv4(ip string) bool {
 	return strings.Contains(ip, ".")
 }
 
@@ -167,7 +167,7 @@ func buildIPRanges(ranges []string) *IPRanges {
 			continue
 		}
 		if !strings.Contains(r, "/") {
-			if isIPv4(r) {
+			if IsIPv4(r) {
 				r += "/32"
 			} else {
 				r += "/128"
@@ -188,11 +188,13 @@ func GenerateIPs(ranges []string) ([]CompactIP, int64) {
 	return ipRanges.ips, seed
 }
 
-func GenerateIPsWithSeed(ranges []string, seed int64) []CompactIP {
-	ipRanges := buildIPRanges(ranges)
+func GenerateIPsWithSeed(ipv4ranges []string, ipv6ranges []string, seed int64) []CompactIP {
+	ipv4 := buildIPRanges(ipv4ranges)
+	ipv6 := buildIPRanges(ipv6ranges)
+	ipv4.ips = append(ipv4.ips, ipv6.ips...)
 	rng := rand.New(rand.NewSource(seed))
-	rng.Shuffle(len(ipRanges.ips), func(i, j int) {
-		ipRanges.ips[i], ipRanges.ips[j] = ipRanges.ips[j], ipRanges.ips[i]
+	rng.Shuffle(len(ipv4.ips), func(i, j int) {
+		ipv4.ips[i], ipv4.ips[j] = ipv4.ips[j], ipv4.ips[i]
 	})
-	return ipRanges.ips
+	return ipv4.ips
 }

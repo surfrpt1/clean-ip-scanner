@@ -1,16 +1,66 @@
 {
+  "log": {
+    "loglevel": "warning"
+  },
   "inbounds": [
     {
-      "port": 10808,
       "protocol": "socks",
+      "listen": "127.0.0.1",
+      "port": 10808,
       "settings": {
-        "udp": true
+        "auth": "noauth",
+        "udp": false
       }
     }
   ],
   "outbounds": [
     {
-      "protocol": "freedom"
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "YOUR_SERVER_IP",
+            "port": 443,
+            "users": [
+              {
+                "id": "YOUR_UUID",
+                "encryption": "none",
+                "level": 8
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "tls",
+        "tlsSettings": {
+          "allowInsecure": true,
+          "serverName": "YOUR_DOMAIN"
+        },
+        "wsSettings": {
+          "path": "/",
+          "headers": {
+            "Host": "YOUR_DOMAIN"
+          }
+        }
+      },
+      "tag": "proxy"
+    },
+    {
+      "protocol": "freedom",
+      "settings": {},
+      "tag": "direct"
     }
-  ]
+  ],
+  "routing": {
+    "domainStrategy": "AsIs",
+    "rules": [
+      {
+        "type": "field",
+        "outboundTag": "proxy",
+        "network": "tcp,udp"
+      }
+    ]
+  }
 }

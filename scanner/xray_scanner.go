@@ -309,12 +309,12 @@ func validateURLConfig(rawURL string) error {
 	scheme := strings.ToLower(parts[0])
 	validSchemes := map[string]bool{"vless": true, "vmess": true, "trojan": true, "ss": true, "shadowsocks": true}
 	if !validSchemes[scheme] {
-		return fmt.Errorf("unsupported protocol '%s' — supported: vless, vmess, trojan, ss", scheme)
+		return fmt.Errorf("unsupported protocol '%s' - supported: vless, vmess, trojan, ss", scheme)
 	}
 	lowerURL := strings.ToLower(rawURL)
 	for _, p := range urlPlaceholders {
 		if strings.Contains(lowerURL, strings.ToLower(p)) {
-			return fmt.Errorf("config contains placeholder value '%s' — please replace with your real config", p)
+			return fmt.Errorf("config contains placeholder value '%s' - please replace with your real config", p)
 		}
 	}
 	switch scheme {
@@ -379,7 +379,7 @@ func validateJSONConfig(content string) error {
 		}
 	}
 	if !hasSocks {
-		return fmt.Errorf("config has no socks or mixed inbound — please add a socks or mixed inbound")
+		return fmt.Errorf("config has no socks or mixed inbound - please add a socks or mixed inbound")
 	}
 	outboundsRaw, ok := cfg["outbounds"]
 	if !ok {
@@ -403,13 +403,13 @@ func validateJSONConfig(content string) error {
 		}
 	}
 	if proxyOut == nil {
-		return fmt.Errorf("config has no proxy outbound — add a vless, vmess, trojan or shadowsocks outbound")
+		return fmt.Errorf("config has no proxy outbound - add a vless, vmess, trojan or shadowsocks outbound")
 	}
 	cfgBytes, _ := json.Marshal(cfg)
 	cfgStr := string(cfgBytes)
 	for _, p := range jsonPlaceholders {
 		if strings.Contains(cfgStr, p) {
-			return fmt.Errorf("config contains placeholder value '%s' — please replace with your real config", p)
+			return fmt.Errorf("config contains placeholder value '%s' - please replace with your real config", p)
 		}
 	}
 	return nil
@@ -431,11 +431,11 @@ func ValidateXrayConfig() error {
 	}
 	data, err := os.ReadFile(xrayJSONConfigPath)
 	if err != nil {
-		return fmt.Errorf("no config found — please edit config/xray_config.txt (URL) or config/xray_config.json (JSON)")
+		return fmt.Errorf("no config found - please edit config/xray_config.txt (URL) or config/xray_config.json (JSON)")
 	}
 	content := strings.TrimSpace(string(data))
 	if content == "" {
-		return fmt.Errorf("config/xray_config.json is empty — please add your config")
+		return fmt.Errorf("config/xray_config.json is empty - please add your config")
 	}
 	if err := validateJSONConfig(content); err != nil {
 		return fmt.Errorf("invalid JSON config in xray_config.json: %v", err)

@@ -14,11 +14,14 @@ import (
 const (
 	tcpConnectTimeout = 1 * time.Second
 	defaultPort       = 443
-	maxRoutines       = 200
 	defaultPingTimes  = 4
+	saveIntervalMode1 = 100
 )
 
-var port = defaultPort
+var (
+	port            = defaultPort
+	overridePingTimes = 0
+)
 
 func SetPort(p int) {
 	if p <= 0 || p > 65535 {
@@ -26,6 +29,19 @@ func SetPort(p int) {
 		return
 	}
 	port = p
+}
+
+func OverridePingTimes(n int) {
+	if n > 0 {
+		overridePingTimes = n
+	}
+}
+
+func getSendCount() int {
+	if overridePingTimes > 0 {
+		return overridePingTimes
+	}
+	return defaultPingTimes
 }
 
 type PingResult struct {
@@ -43,7 +59,7 @@ func (p *PingResult) GetLossRate() float32 {
 func tcping(ip *net.IPAddr) (bool, time.Duration) {
 	start := time.Now()
 	var addr string
-	if isIPv4(ip.String()) {
+	if IsIPv4(ip.String()) {
 		addr = fmt.Sprintf("%s:%d", ip.String(), port)
 	} else {
 		addr = fmt.Sprintf("[%s]:%d", ip.String(), port)
@@ -57,7 +73,8 @@ func tcping(ip *net.IPAddr) (bool, time.Duration) {
 }
 
 func checkConnection(ip *net.IPAddr) (recv int, totalDelay time.Duration) {
-	for i := 0; i < defaultPingTimes; i++ {
+	sendCount := getSendCount()
+	for i := 0; i < sendCount; i++ {
 		if ok, d := tcping(ip); ok {
 			recv++
 			totalDelay += d
@@ -66,12 +83,12 @@ func checkConnection(ip *net.IPAddr) (recv int, totalDelay time.Duration) {
 	return
 }
 
-func PingIPs(stopCh <-chan struct{}, ips []CompactIP, cp *Checkpoint, existingResults []PingResult) []PingResult {
+func PingIPsTCP(stopCh <-chan struct{}, ips []CompactIP, workers int, cp *Checkpoint, existingResults []PingResult) []PingResult {
 	var results []PingResult
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
-	control := make(chan struct{}, maxRoutines)
+	control := make(chan struct{}, workers)
 	total := len(ips)
 	processedCount := 0
 	baseIndex := 0
@@ -80,9 +97,10 @@ func PingIPs(stopCh <-chan struct{}, ips []CompactIP, cp *Checkpoint, existingRe
 	}
 
 	timeoutMs := int(tcpConnectTimeout.Milliseconds())
+	sendCount := getSendCount()
 
 	cyan := color.New(color.FgCyan)
-	cyan.Printf("Start latency test (Mode: TCP, Port: %d, Range: 0 ~ %d ms, Packet Loss: 1.00)\n", port, timeoutMs)
+	cyan.Printf("Start latency test (Mode: TCP, Port: %d, Range: 0 ~ %d ms)\n", port, timeoutMs)
 
 	bar := newBar(total, "Available:", "")
 
@@ -112,7 +130,7 @@ func PingIPs(stopCh <-chan struct{}, ips []CompactIP, cp *Checkpoint, existingRe
 				avg := totalDelay / time.Duration(recv)
 				results = append(results, PingResult{
 					IP:       ipAddr,
-					Sended:   defaultPingTimes,
+					Sended:   sendCount,
 					Received: recv,
 					Delay:    avg,
 				})
